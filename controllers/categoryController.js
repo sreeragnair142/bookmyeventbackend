@@ -29,14 +29,14 @@ export const getAllCategories = async (req, res) => {
       .populate('parentCategory', 'name')
       .populate('createdBy', 'firstName lastName')
       .sort({ displayOrder: 1, createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
 
     const total = await Category.countDocuments(filter);
 
     const pagination = {
       currentPage: parseInt(page),
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / parseInt(limit)),
       totalItems: total,
       itemsPerPage: parseInt(limit)
     };
@@ -78,11 +78,29 @@ export const createCategory = async (req, res) => {
       return errorResponse(res, 'Category image is required', 400);
     }
 
+    // Generate slug from name if not provided
+    const generateSlug = (name) => {
+      return name
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '') // Remove special characters
+        .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
+        .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+    };
+
     const categoryData = {
       ...req.body,
+      slug: req.body.slug || generateSlug(req.body.name),
       image: req.file.path.replace(/\\/g, '/'),
       createdBy: req.user._id
     };
+
+    // Check if slug already exists
+    const existingCategory = await Category.findOne({ slug: categoryData.slug });
+    if (existingCategory) {
+      // Add timestamp to make slug unique
+      categoryData.slug = `${categoryData.slug}-${Date.now()}`;
+    }
 
     const category = new Category(categoryData);
     await category.save();
@@ -94,7 +112,10 @@ export const createCategory = async (req, res) => {
     return successResponse(res, { category: populatedCategory }, 'Category created successfully', 201);
   } catch (error) {
     console.error('Create category error:', error);
-    return errorResponse(res, 'Error creating category', 500);
+    if (error.code === 11000) {
+      return errorResponse(res, 'Category name already exists', 400);
+    }
+    return errorResponse(res, error.message || 'Error creating category', 500);
   }
 };
 
@@ -107,6 +128,29 @@ export const updateCategory = async (req, res) => {
     }
 
     const updateData = { ...req.body };
+    
+    // Generate slug if name is being updated and no slug provided
+    if (updateData.name && !updateData.slug) {
+      const generateSlug = (name) => {
+        return name
+          .toLowerCase()
+          .trim()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/[\s_-]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+      };
+      
+      updateData.slug = generateSlug(updateData.name);
+      
+      // Check if slug already exists (excluding current category)
+      const existingCategory = await Category.findOne({ 
+        slug: updateData.slug,
+        _id: { $ne: req.params.id }
+      });
+      if (existingCategory) {
+        updateData.slug = `${updateData.slug}-${Date.now()}`;
+      }
+    }
     
     if (req.file) {
       updateData.image = req.file.path.replace(/\\/g, '/');
@@ -124,7 +168,10 @@ export const updateCategory = async (req, res) => {
     return successResponse(res, { category: updatedCategory }, 'Category updated successfully');
   } catch (error) {
     console.error('Update category error:', error);
-    return errorResponse(res, 'Error updating category', 500);
+    if (error.code === 11000) {
+      return errorResponse(res, 'Category name already exists', 400);
+    }
+    return errorResponse(res, error.message || 'Error updating category', 500);
   }
 };
 

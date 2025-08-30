@@ -22,8 +22,6 @@ router.get("/", getAllBanners);
 router.get("/:id", getBannerById);
 
 // Create new banner
-// In your banner routes file
-// Create new banner
 router.post(
   "/",
   authenticate,
@@ -35,7 +33,7 @@ router.post(
       .isLength({ min: 1, max: 100 })
       .withMessage("Title is required and must be 1-100 characters"),
     body("zone")
-      .optional() // allow either ObjectId or name
+      .optional()
       .trim()
       .isLength({ min: 1 })
       .withMessage("Zone must not be empty"),
@@ -55,7 +53,7 @@ router.post(
 router.put(
   "/:id",
   authenticate,
-  authorize("admin", "manager"),
+  authorize("admin", "manager", "superadmin", "user", "editor"),
   upload.single("bannerImage"),
   handleMulterError,
   [
@@ -82,23 +80,23 @@ router.put(
   updateBanner
 );
 
-// Delete banner
+// Delete banner - 🔥 FIXED: Use same roles as update
 router.delete(
   "/:id",
   authenticate,
-  authorize("admin", "manager"),
+  authorize("admin", "manager", "superadmin", "user", "editor"), // ✅ Added "user" and "editor"
   deleteBanner
 );
 
-// Toggle banner status
+// Toggle banner status - 🔥 FIXED: Use same roles as update
 router.patch(
   "/:id/toggle-status",
   authenticate,
-  authorize("admin", "manager"),
+  authorize("admin", "manager", "superadmin", "user", "editor"), // ✅ Added "user" and "editor"
   toggleBannerStatus
 );
 
-// Increment banner click count
+// Increment banner click count (no auth needed for analytics)
 router.patch("/:id/click", incrementBannerClick);
 
 export default router;

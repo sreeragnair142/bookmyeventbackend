@@ -35,6 +35,7 @@ export const authenticate = async (req, res, next) => {
       req.user = user;
       next();
     } catch (jwtError) {
+      console.error('JWT verification error:', jwtError);
       return res.status(401).json({
         success: false,
         message: 'Token is not valid.'
@@ -58,10 +59,13 @@ export const authorize = (...roles) => {
       });
     }
 
+    console.log('User role:', req.user.role); // Debug log
+    console.log('Required roles:', roles); // Debug log
+
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. Insufficient permissions.'
+        message: `Access denied. Required roles: ${roles.join(', ')}. Your role: ${req.user.role}`
       });
     }
 

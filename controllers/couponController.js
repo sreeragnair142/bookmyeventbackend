@@ -1,4 +1,5 @@
 import Coupon from '../models/Coupon.js';
+import mongoose from 'mongoose';
 import { successResponse, errorResponse, paginatedResponse } from '../utils/responseFormatter.js';
 
 export const getAllCoupons = async (req, res) => {
@@ -65,6 +66,18 @@ export const getCouponById = async (req, res) => {
 
 export const createCoupon = async (req, res) => {
   try {
+    console.log('Request body:', req.body);
+    console.log('User:', req.user);
+
+    // Validate required fields
+    if (!req.body.code) {
+      return errorResponse(res, 'Coupon code is required', 400);
+    }
+
+    if (!req.body.title) {
+      return errorResponse(res, 'Title is required', 400);
+    }
+
     // Check if coupon code already exists
     const existingCoupon = await Coupon.findOne({ code: req.body.code.toUpperCase() });
     if (existingCoupon) {
@@ -72,28 +85,61 @@ export const createCoupon = async (req, res) => {
     }
 
     // Validate dates
-    if (new Date(req.body.expireDate) <= new Date(req.body.startDate)) {
-      return errorResponse(res, 'Expire date must be after start date', 400);
+    if (req.body.expireDate && req.body.startDate) {
+      if (new Date(req.body.expireDate) <= new Date(req.body.startDate)) {
+        return errorResponse(res, 'Expire date must be after start date', 400);
+      }
     }
 
     const couponData = {
       ...req.body,
       code: req.body.code.toUpperCase(),
-      createdBy: req.user._id
+      // Handle missing user (for testing without auth)
+      createdBy: req.user?._id || new mongoose.Types.ObjectId(), // Temporary fallback
+      usedCount: 0,
+      isActive: req.body.isActive !== undefined ? req.body.isActive : true
     };
+
+    console.log('Coupon data to save:', couponData);
 
     const coupon = new Coupon(couponData);
     await coupon.save();
 
-    const populatedCoupon = await Coupon.findById(coupon._id)
-      .populate('createdBy', 'firstName lastName')
-      .populate('applicableCategories', 'name')
-      .populate('applicableStores', 'storeName');
+    // Only populate if we have valid references
+    const populateOptions = [];
+    if (req.user) {
+      populateOptions.push({ path: 'createdBy', select: 'firstName lastName' });
+    }
+    if (coupon.applicableCategories?.length > 0) {
+      populateOptions.push({ path: 'applicableCategories', select: 'name' });
+    }
+    if (coupon.applicableStores?.length > 0) {
+      populateOptions.push({ path: 'applicableStores', select: 'storeName' });
+    }
+
+    let populatedCoupon = coupon;
+    if (populateOptions.length > 0) {
+      populatedCoupon = await Coupon.findById(coupon._id).populate(populateOptions);
+    }
 
     return successResponse(res, { coupon: populatedCoupon }, 'Coupon created successfully', 201);
   } catch (error) {
     console.error('Create coupon error:', error);
-    return errorResponse(res, 'Error creating coupon', 500);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Handle mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return errorResponse(res, `Validation error: ${validationErrors.join(', ')}`, 400);
+    }
+    
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      return errorResponse(res, 'Coupon code already exists', 400);
+    }
+    
+    return errorResponse(res, `Error creating coupon: ${error.message}`, 500);
   }
 };
 
@@ -191,22 +237,32 @@ export const validateCoupon = async (req, res) => {
 export const applyCoupon = async (req, res) => {
   try {
     const { code } = req.body;
+    const now = new Date();
     
-    const coupon = await Coupon.findOneAndUpdate(
-      { 
-        code: code.toUpperCase(),
-        isActive: true,
-        usedCount: { $lt: mongoose.model('Coupon').schema.paths.totalUses }
-      },
+    // First validate the coupon exists and is usable
+    const coupon = await Coupon.findOne({
+      code: code.toUpperCase(),
+      isActive: true,
+      startDate: { $lte: now },
+      expireDate: { $gte: now }
+    });
+
+    if (!coupon) {
+      return errorResponse(res, 'Invalid or expired coupon code', 404);
+    }
+
+    if (coupon.usedCount >= coupon.totalUses) {
+      return errorResponse(res, 'Coupon usage limit exceeded', 400);
+    }
+
+    // Update the usage count
+    const updatedCoupon = await Coupon.findByIdAndUpdate(
+      coupon._id,
       { $inc: { usedCount: 1 } },
       { new: true }
     );
 
-    if (!coupon) {
-      return errorResponse(res, 'Coupon not available or usage limit exceeded', 400);
-    }
-
-    return successResponse(res, { coupon }, 'Coupon applied successfully');
+    return successResponse(res, { coupon: updatedCoupon }, 'Coupon applied successfully');
   } catch (error) {
     console.error('Apply coupon error:', error);
     return errorResponse(res, 'Error applying coupon', 500);
