@@ -43,11 +43,11 @@ router.post('/',
       .isLength({ max: 500 })
       .withMessage('Description must be less than 500 characters'),
     body('parentCategory')
-      .optional()
+      .optional({ checkFalsy: true })
       .isMongoId()
       .withMessage('Valid parent category ID required'),
     body('displayOrder')
-      .optional()
+      .optional({ checkFalsy: true })
       .isInt({ min: 0 })
       .withMessage('Display order must be a non-negative integer'),
     body('isActive')
@@ -86,7 +86,7 @@ router.put('/:id',
       .isLength({ max: 500 })
       .withMessage('Description must be less than 500 characters'),
     body('parentCategory')
-      .optional()
+      .optional({ checkFalsy: true })
       .isMongoId()
       .withMessage('Valid parent category ID required'),
     body('displayOrder')

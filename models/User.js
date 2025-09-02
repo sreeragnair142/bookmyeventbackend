@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: [true, 'Email is required'],
-    unique: true,  // this alone is enough
+    unique: true,
     lowercase: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
@@ -33,8 +33,8 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'manager', 'user'],
-    default: 'user'
+    enum: ['admin', 'superadmin'],
+    default: 'admin'
   },
   isActive: {
     type: Boolean,
@@ -50,7 +50,7 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// ✅ Keep only this index
+// Keep only this index
 userSchema.index({ isActive: 1 });
 
 // Hash password before saving

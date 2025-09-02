@@ -77,16 +77,16 @@ const providerSchema = new mongoose.Schema({
   },
   
   // Delivery Information
-  estimatedDeliveryTime: {
-    min: {
-      type: Number,
-      required: [true, 'Minimum delivery time is required']
-    },
-    max: {
-      type: Number,
-      required: [true, 'Maximum delivery time is required']
-    }
-  },
+// Delivery Information
+minimumDeliveryTime: {
+  type: Number,
+  required: [true, 'Minimum delivery time is required']
+},
+maximumDeliveryTime: {
+  type: Number,
+  required: [true, 'Maximum delivery time is required']
+},
+
   
   // Status and Features
   isActive: {

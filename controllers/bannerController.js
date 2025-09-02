@@ -164,6 +164,7 @@ export const deleteBanner = async (req, res) => {
   }
 };
 
+// Fixed toggleBannerStatus controller - replace your existing one
 export const toggleBannerStatus = async (req, res) => {
   try {
     const banner = await Banner.findById(req.params.id);
@@ -172,16 +173,40 @@ export const toggleBannerStatus = async (req, res) => {
       return errorResponse(res, 'Banner not found', 404);
     }
 
-    banner.isActive = !banner.isActive;
-    await banner.save();
+    // Handle both isActive and isFeatured fields
+    const updateData = {};
+    
+    if (req.body.hasOwnProperty('isActive')) {
+      updateData.isActive = req.body.isActive;
+    }
+    
+    if (req.body.hasOwnProperty('isFeatured')) {
+      updateData.isFeatured = req.body.isFeatured;
+    }
 
-    return successResponse(res, { banner }, `Banner ${banner.isActive ? 'activated' : 'deactivated'} successfully`);
+    if (Object.keys(updateData).length === 0) {
+      return errorResponse(res, 'No valid fields to update', 400);
+    }
+
+    const updatedBanner = await Banner.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    ).populate([
+      { path: 'zone', select: 'name' },
+      { path: 'store', select: 'storeName' },
+      { path: 'createdBy', select: 'firstName lastName' }
+    ]);
+
+    const field = req.body.hasOwnProperty('isActive') ? 'isActive' : 'isFeatured';
+    const status = updatedBanner[field] ? 'activated' : 'deactivated';
+    
+    return successResponse(res, { banner: updatedBanner }, `Banner ${status} successfully`);
   } catch (error) {
     console.error('Toggle banner status error:', error);
     return errorResponse(res, 'Error updating banner status', 500);
   }
 };
-
 export const incrementBannerClick = async (req, res) => {
   try {
     const banner = await Banner.findByIdAndUpdate(

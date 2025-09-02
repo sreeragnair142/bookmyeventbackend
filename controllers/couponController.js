@@ -22,10 +22,42 @@ export const getAllCoupons = async (req, res) => {
       ];
     }
 
-    const coupons = await Coupon.find(filter)
-      .populate('createdBy', 'firstName lastName')
-      .populate('applicableCategories', 'name')
-      .populate('applicableStores', 'storeName')
+    // Build populate array dynamically to avoid missing schema errors
+    const populateOptions = [];
+    
+    // Only populate if the referenced models exist
+    try {
+      // Check if User model exists for createdBy
+      mongoose.model('User');
+      populateOptions.push({ path: 'createdBy', select: 'firstName lastName' });
+    } catch (e) {
+      console.log('User model not found, skipping createdBy populate');
+    }
+
+    try {
+      // Check if Category model exists for applicableCategories
+      mongoose.model('Category');
+      populateOptions.push({ path: 'applicableCategories', select: 'name' });
+    } catch (e) {
+      console.log('Category model not found, skipping applicableCategories populate');
+    }
+
+    try {
+      // Check if Store model exists for applicableStores
+      mongoose.model('Store');
+      populateOptions.push({ path: 'applicableStores', select: 'storeName' });
+    } catch (e) {
+      console.log('Store model not found, skipping applicableStores populate');
+    }
+
+    // Build query with dynamic populate
+    let query = Coupon.find(filter);
+    
+    if (populateOptions.length > 0) {
+      query = query.populate(populateOptions);
+    }
+
+    const coupons = await query
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -48,10 +80,37 @@ export const getAllCoupons = async (req, res) => {
 
 export const getCouponById = async (req, res) => {
   try {
-    const coupon = await Coupon.findById(req.params.id)
-      .populate('createdBy', 'firstName lastName')
-      .populate('applicableCategories', 'name')
-      .populate('applicableStores', 'storeName');
+    // Build populate array dynamically
+    const populateOptions = [];
+    
+    try {
+      mongoose.model('User');
+      populateOptions.push({ path: 'createdBy', select: 'firstName lastName' });
+    } catch (e) {
+      console.log('User model not found, skipping createdBy populate');
+    }
+
+    try {
+      mongoose.model('Category');
+      populateOptions.push({ path: 'applicableCategories', select: 'name' });
+    } catch (e) {
+      console.log('Category model not found, skipping applicableCategories populate');
+    }
+
+    try {
+      mongoose.model('Store');
+      populateOptions.push({ path: 'applicableStores', select: 'storeName' });
+    } catch (e) {
+      console.log('Store model not found, skipping applicableStores populate');
+    }
+
+    let query = Coupon.findById(req.params.id);
+    
+    if (populateOptions.length > 0) {
+      query = query.populate(populateOptions);
+    }
+
+    const coupon = await query;
 
     if (!coupon) {
       return errorResponse(res, 'Coupon not found', 404);
@@ -78,6 +137,10 @@ export const createCoupon = async (req, res) => {
       return errorResponse(res, 'Title is required', 400);
     }
 
+    if (!req.body.discount) {
+      return errorResponse(res, 'Discount is required', 400);
+    }
+
     // Check if coupon code already exists
     const existingCoupon = await Coupon.findOne({ code: req.body.code.toUpperCase() });
     if (existingCoupon) {
@@ -92,34 +155,78 @@ export const createCoupon = async (req, res) => {
     }
 
     const couponData = {
-      ...req.body,
+      title: req.body.title,
       code: req.body.code.toUpperCase(),
-      // Handle missing user (for testing without auth)
-      createdBy: req.user?._id || new mongoose.Types.ObjectId(), // Temporary fallback
+      type: req.body.type || 'percentage',
+      discount: parseFloat(req.body.discount),
+      discountType: req.body.discountType || 'percentage',
+      totalUses: parseInt(req.body.totalUses) || 1,
+      minPurchase: parseFloat(req.body.minPurchase) || 0,
+      maxDiscount: req.body.maxDiscount ? parseFloat(req.body.maxDiscount) : undefined,
+      startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
+      expireDate: req.body.expireDate ? new Date(req.body.expireDate) : undefined,
+      description: req.body.description || '',
       usedCount: 0,
       isActive: req.body.isActive !== undefined ? req.body.isActive : true
     };
+
+    // Only add createdBy if user exists and is authenticated
+    if (req.user && req.user._id) {
+      couponData.createdBy = req.user._id;
+    }
+
+    // Handle optional array fields safely
+    if (req.body.applicableCategories && Array.isArray(req.body.applicableCategories)) {
+      couponData.applicableCategories = req.body.applicableCategories;
+    }
+
+    if (req.body.applicableStores && Array.isArray(req.body.applicableStores)) {
+      couponData.applicableStores = req.body.applicableStores;
+    }
 
     console.log('Coupon data to save:', couponData);
 
     const coupon = new Coupon(couponData);
     await coupon.save();
 
-    // Only populate if we have valid references
+    // Build populate array dynamically for response
     const populateOptions = [];
-    if (req.user) {
-      populateOptions.push({ path: 'createdBy', select: 'firstName lastName' });
+    
+    if (coupon.createdBy) {
+      try {
+        mongoose.model('User');
+        populateOptions.push({ path: 'createdBy', select: 'firstName lastName' });
+      } catch (e) {
+        console.log('User model not found, skipping createdBy populate');
+      }
     }
+
     if (coupon.applicableCategories?.length > 0) {
-      populateOptions.push({ path: 'applicableCategories', select: 'name' });
+      try {
+        mongoose.model('Category');
+        populateOptions.push({ path: 'applicableCategories', select: 'name' });
+      } catch (e) {
+        console.log('Category model not found, skipping applicableCategories populate');
+      }
     }
+
     if (coupon.applicableStores?.length > 0) {
-      populateOptions.push({ path: 'applicableStores', select: 'storeName' });
+      try {
+        mongoose.model('Store');
+        populateOptions.push({ path: 'applicableStores', select: 'storeName' });
+      } catch (e) {
+        console.log('Store model not found, skipping applicableStores populate');
+      }
     }
 
     let populatedCoupon = coupon;
     if (populateOptions.length > 0) {
-      populatedCoupon = await Coupon.findById(coupon._id).populate(populateOptions);
+      try {
+        populatedCoupon = await Coupon.findById(coupon._id).populate(populateOptions);
+      } catch (populateError) {
+        console.log('Error populating coupon, returning unpopulated version:', populateError.message);
+        populatedCoupon = coupon;
+      }
     }
 
     return successResponse(res, { coupon: populatedCoupon }, 'Coupon created successfully', 201);
@@ -155,15 +262,41 @@ export const updateCoupon = async (req, res) => {
     const updateData = { ...req.body };
     delete updateData.code;
 
-    const updatedCoupon = await Coupon.findByIdAndUpdate(
+    // Build populate array dynamically
+    const populateOptions = [];
+    
+    try {
+      mongoose.model('User');
+      populateOptions.push({ path: 'createdBy', select: 'firstName lastName' });
+    } catch (e) {
+      console.log('User model not found, skipping createdBy populate');
+    }
+
+    try {
+      mongoose.model('Category');
+      populateOptions.push({ path: 'applicableCategories', select: 'name' });
+    } catch (e) {
+      console.log('Category model not found, skipping applicableCategories populate');
+    }
+
+    try {
+      mongoose.model('Store');
+      populateOptions.push({ path: 'applicableStores', select: 'storeName' });
+    } catch (e) {
+      console.log('Store model not found, skipping applicableStores populate');
+    }
+
+    let query = Coupon.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    ).populate([
-      { path: 'createdBy', select: 'firstName lastName' },
-      { path: 'applicableCategories', select: 'name' },
-      { path: 'applicableStores', select: 'storeName' }
-    ]);
+    );
+
+    if (populateOptions.length > 0) {
+      query = query.populate(populateOptions);
+    }
+
+    const updatedCoupon = await query;
 
     return successResponse(res, { coupon: updatedCoupon }, 'Coupon updated successfully');
   } catch (error) {
@@ -215,15 +348,19 @@ export const validateCoupon = async (req, res) => {
     const coupon = await Coupon.findOne({ 
       code: code.toUpperCase(),
       isActive: true,
-      startDate: { $lte: now },
-      expireDate: { $gte: now }
+      $or: [
+        { startDate: { $lte: now }, expireDate: { $gte: now } },
+        { startDate: { $exists: false }, expireDate: { $exists: false } },
+        { startDate: { $lte: now }, expireDate: { $exists: false } },
+        { startDate: { $exists: false }, expireDate: { $gte: now } }
+      ]
     });
 
     if (!coupon) {
       return errorResponse(res, 'Invalid or expired coupon code', 404);
     }
 
-    if (coupon.usedCount >= coupon.totalUses) {
+    if (coupon.totalUses && coupon.usedCount >= coupon.totalUses) {
       return errorResponse(res, 'Coupon usage limit exceeded', 400);
     }
 
@@ -243,15 +380,19 @@ export const applyCoupon = async (req, res) => {
     const coupon = await Coupon.findOne({
       code: code.toUpperCase(),
       isActive: true,
-      startDate: { $lte: now },
-      expireDate: { $gte: now }
+      $or: [
+        { startDate: { $lte: now }, expireDate: { $gte: now } },
+        { startDate: { $exists: false }, expireDate: { $exists: false } },
+        { startDate: { $lte: now }, expireDate: { $exists: false } },
+        { startDate: { $exists: false }, expireDate: { $gte: now } }
+      ]
     });
 
     if (!coupon) {
       return errorResponse(res, 'Invalid or expired coupon code', 404);
     }
 
-    if (coupon.usedCount >= coupon.totalUses) {
+    if (coupon.totalUses && coupon.usedCount >= coupon.totalUses) {
       return errorResponse(res, 'Coupon usage limit exceeded', 400);
     }
 

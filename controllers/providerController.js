@@ -70,21 +70,20 @@ export const getProviderById = async (req, res) => {
 
 export const updateProvider = async (req, res) => {
   try {
+    console.log('Update request received for ID:', req.params.id);
+    console.log('Request body:', req.body);
+    console.log('Request files:', req.files);
+
     const provider = await Provider.findById(req.params.id);
-    
     if (!provider) {
       return errorResponse(res, 'Provider not found', 404);
     }
 
     const updateData = { ...req.body };
-    
     if (req.files) {
-      if (req.files.logo) {
-        updateData.logo = req.files.logo[0].path.replace(/\\/g, '/');
-      }
-      if (req.files.coverImage) {
-        updateData.coverImage = req.files.coverImage[0].path.replace(/\\/g, '/');
-      }
+      if (req.files.logo) updateData.logo = req.files.logo[0].path.replace(/\\/g, '/');
+      if (req.files.coverImage) updateData.coverImage = req.files.coverImage[0].path.replace(/\\/g, '/');
+      if (req.files.tinCertificate) updateData.tinCertificate = req.files.tinCertificate[0].path.replace(/\\/g, '/');
     }
 
     const updatedProvider = await Provider.findByIdAndUpdate(
@@ -103,7 +102,6 @@ export const updateProvider = async (req, res) => {
     return errorResponse(res, 'Error updating provider', 500);
   }
 };
-
 export const toggleProviderStatus = async (req, res) => {
   try {
     const provider = await Provider.findById(req.params.id);

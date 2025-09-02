@@ -1,3 +1,4 @@
+// ===== COUPON MODEL (Coupon.js) =====
 import mongoose from 'mongoose';
 
 const couponSchema = new mongoose.Schema({
@@ -10,7 +11,7 @@ const couponSchema = new mongoose.Schema({
   code: {
     type: String,
     required: [true, 'Coupon code is required'],
-    unique: true,  // ✅ This creates the index automatically
+    unique: true,
     uppercase: true,
     trim: true,
     match: [/^[A-Z0-9]{3,20}$/, 'Coupon code must be 3-20 characters, alphanumeric only']
@@ -79,8 +80,7 @@ const couponSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// ✅ Indexes for performance (removed duplicate code index)
-// couponSchema.index({ code: 1 }); // ❌ REMOVED - duplicate of unique: true
+// Indexes for performance
 couponSchema.index({ isActive: 1, startDate: 1, expireDate: 1 });
 couponSchema.index({ type: 1 });
 
@@ -91,6 +91,20 @@ couponSchema.pre('save', function(next) {
   } else {
     next();
   }
+});
+
+// Validate expire date on update
+couponSchema.pre('findOneAndUpdate', function(next) {
+  const update = this.getUpdate();
+  if (update.startDate || update.expireDate) {
+    const startDate = update.startDate || this.getQuery().startDate;
+    const expireDate = update.expireDate || this.getQuery().expireDate;
+    
+    if (startDate && expireDate && new Date(expireDate) <= new Date(startDate)) {
+      next(new Error('Expire date must be after start date'));
+    }
+  }
+  next();
 });
 
 export default mongoose.model('Coupon', couponSchema);

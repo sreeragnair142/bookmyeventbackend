@@ -18,7 +18,7 @@ const categorySchema = new mongoose.Schema({
   },
   slug: {
     type: String,
-    unique: true,  // ✅ This creates the index automatically
+    unique: true,  
     required: true
   },
   parentCategory: {

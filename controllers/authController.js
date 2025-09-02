@@ -26,7 +26,7 @@ export const register = async (req, res) => {
       email,
       password,
       phone,
-      role: role || 'user'
+      role: role || 'admin'
     });
 
     await user.save();
