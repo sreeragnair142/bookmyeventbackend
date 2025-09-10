@@ -59,16 +59,29 @@ export const authorize = (...roles) => {
       });
     }
 
-    console.log('User role:', req.user.role); // Debug log
-    console.log('Required roles:', roles); // Debug log
+    // Normalize the user role
+    const userRole = req.user.role?.toString().trim().toLowerCase();
+    
+    console.log('User role:', req.user.role);
+    console.log('Required roles:', roles);
 
-    if (!roles.includes(req.user.role)) {
+    // Admin override - admins can access everything
+    if (userRole === 'admin') {
+      console.log('Admin access granted');
+      return next();
+    }
+
+    // Check if user's role is in the required roles (normalize for comparison)
+    const normalizedRoles = roles.map(role => role.toString().trim().toLowerCase());
+    
+    if (!normalizedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: `Access denied. Required roles: ${roles.join(', ')}. Your role: ${req.user.role}`
       });
     }
 
+    console.log('Authorization successful for user role:', req.user.role);
     next();
   };
 };

@@ -1,8 +1,8 @@
-import Banner from '../models/Banner.js';
+import AuditoriumBanner from '../models/audiBanner.js';
 import mongoose from 'mongoose';
 import { successResponse, errorResponse, paginatedResponse } from '../utils/responseFormatter.js';
 
-export const getAllBanners = async (req, res) => {
+export const getAllAuditoriumBanners = async (req, res) => {
   try {
     const {
       page = 1,
@@ -19,7 +19,7 @@ export const getAllBanners = async (req, res) => {
     if (isActive !== undefined) filter.isActive = isActive === 'true';
     if (isFeatured !== undefined) filter.isFeatured = isFeatured === 'true';
 
-    const banners = await Banner.find(filter)
+    const banners = await AuditoriumBanner.find(filter)
       .populate('zone', 'name')
       .populate('store', 'storeName')
       .populate('createdBy', 'firstName lastName')
@@ -27,7 +27,7 @@ export const getAllBanners = async (req, res) => {
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
-    const total = await Banner.countDocuments(filter);
+    const total = await AuditoriumBanner.countDocuments(filter);
 
     const pagination = {
       currentPage: parseInt(page),
@@ -36,35 +36,35 @@ export const getAllBanners = async (req, res) => {
       itemsPerPage: parseInt(limit)
     };
 
-    return paginatedResponse(res, { banners }, pagination, 'Banners fetched successfully');
+    return paginatedResponse(res, { banners }, pagination, 'Auditorium banners fetched successfully');
   } catch (error) {
-    console.error('Get banners error:', error);
-    return errorResponse(res, 'Error fetching banners', 500);
+    console.error('Get auditorium banners error:', error);
+    return errorResponse(res, 'Error fetching auditorium banners', 500);
   }
 };
 
-export const getBannerById = async (req, res) => {
+export const getAuditoriumBannerById = async (req, res) => {
   try {
-    const banner = await Banner.findById(req.params.id)
+    const banner = await AuditoriumBanner.findById(req.params.id)
       .populate('zone', 'name')
       .populate('store', 'storeName')
       .populate('createdBy', 'firstName lastName');
 
     if (!banner) {
-      return errorResponse(res, 'Banner not found', 404);
+      return errorResponse(res, 'Auditorium banner not found', 404);
     }
 
-    return successResponse(res, { banner }, 'Banner fetched successfully');
+    return successResponse(res, { banner }, 'Auditorium banner fetched successfully');
   } catch (error) {
-    console.error('Get banner error:', error);
-    return errorResponse(res, 'Error fetching banner', 500);
+    console.error('Get auditorium banner error:', error);
+    return errorResponse(res, 'Error fetching auditorium banner', 500);
   }
 };
 
-export const createBanner = async (req, res) => {
+export const createAuditoriumBanner = async (req, res) => {
   try {
-    console.log("Incoming body:", req.body);
-    console.log("Incoming file:", req.file);
+    console.log("Incoming auditorium banner body:", req.body);
+    console.log("Incoming auditorium banner file:", req.file);
     console.log("User from auth:", req.user);
 
     const { zone, ...otherData } = req.body;
@@ -89,27 +89,27 @@ export const createBanner = async (req, res) => {
       bannerData.image = req.file.path.replace(/\\/g, "/");
     }
 
-    const banner = new Banner(bannerData);
+    const banner = new AuditoriumBanner(bannerData);
     await banner.save();
 
-    const populatedBanner = await Banner.findById(banner._id)
+    const populatedBanner = await AuditoriumBanner.findById(banner._id)
       .populate("zone", "name")
       .populate("store", "storeName")
       .populate("createdBy", "firstName lastName");
 
-    return successResponse(res, { banner: populatedBanner }, "Banner created successfully", 201);
+    return successResponse(res, { banner: populatedBanner }, "Auditorium banner created successfully", 201);
   } catch (error) {
-    console.error("Create banner error:", error);
-    return errorResponse(res, error.message || "Error creating banner", 500);
+    console.error("Create auditorium banner error:", error);
+    return errorResponse(res, error.message || "Error creating auditorium banner", 500);
   }
 };
 
-export const updateBanner = async (req, res) => {
+export const updateAuditoriumBanner = async (req, res) => {
   try {
-    const banner = await Banner.findById(req.params.id);
+    const banner = await AuditoriumBanner.findById(req.params.id);
 
     if (!banner) {
-      return errorResponse(res, 'Banner not found', 404);
+      return errorResponse(res, 'Auditorium banner not found', 404);
     }
 
     const updateData = { ...req.body };
@@ -127,7 +127,7 @@ export const updateBanner = async (req, res) => {
       updateData.image = req.file.path.replace(/\\/g, '/');
     }
 
-    const updatedBanner = await Banner.findByIdAndUpdate(
+    const updatedBanner = await AuditoriumBanner.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true, runValidators: true }
@@ -137,36 +137,36 @@ export const updateBanner = async (req, res) => {
       { path: 'createdBy', select: 'firstName lastName' }
     ]);
 
-    return successResponse(res, { banner: updatedBanner }, 'Banner updated successfully');
+    return successResponse(res, { banner: updatedBanner }, 'Auditorium banner updated successfully');
   } catch (error) {
-    console.error('Update banner error:', error);
-    return errorResponse(res, 'Error updating banner', 500);
+    console.error('Update auditorium banner error:', error);
+    return errorResponse(res, 'Error updating auditorium banner', 500);
   }
 };
 
-export const deleteBanner = async (req, res) => {
+export const deleteAuditoriumBanner = async (req, res) => {
   try {
-    const banner = await Banner.findById(req.params.id);
+    const banner = await AuditoriumBanner.findById(req.params.id);
 
     if (!banner) {
-      return errorResponse(res, 'Banner not found', 404);
+      return errorResponse(res, 'Auditorium banner not found', 404);
     }
 
-    await Banner.findByIdAndDelete(req.params.id);
+    await AuditoriumBanner.findByIdAndDelete(req.params.id);
 
-    return successResponse(res, null, 'Banner deleted successfully');
+    return successResponse(res, null, 'Auditorium banner deleted successfully');
   } catch (error) {
-    console.error('Delete banner error:', error);
-    return errorResponse(res, 'Error deleting banner', 500);
+    console.error('Delete auditorium banner error:', error);
+    return errorResponse(res, 'Error deleting auditorium banner', 500);
   }
 };
 
-export const toggleBannerStatus = async (req, res) => {
+export const toggleAuditoriumBannerStatus = async (req, res) => {
   try {
-    const banner = await Banner.findById(req.params.id);
+    const banner = await AuditoriumBanner.findById(req.params.id);
 
     if (!banner) {
-      return errorResponse(res, 'Banner not found', 404);
+      return errorResponse(res, 'Auditorium banner not found', 404);
     }
 
     const updateData = {};
@@ -183,7 +183,7 @@ export const toggleBannerStatus = async (req, res) => {
       return errorResponse(res, 'No valid fields to update', 400);
     }
 
-    const updatedBanner = await Banner.findByIdAndUpdate(
+    const updatedBanner = await AuditoriumBanner.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true }
@@ -196,28 +196,28 @@ export const toggleBannerStatus = async (req, res) => {
     const field = req.body.hasOwnProperty('isActive') ? 'isActive' : 'isFeatured';
     const status = updatedBanner[field] ? 'activated' : 'deactivated';
 
-    return successResponse(res, { banner: updatedBanner }, `Banner ${status} successfully`);
+    return successResponse(res, { banner: updatedBanner }, `Auditorium banner ${status} successfully`);
   } catch (error) {
-    console.error('Toggle banner status error:', error);
-    return errorResponse(res, 'Error updating banner status', 500);
+    console.error('Toggle auditorium banner status error:', error);
+    return errorResponse(res, 'Error updating auditorium banner status', 500);
   }
 };
 
-export const incrementBannerClick = async (req, res) => {
+export const incrementAuditoriumBannerClick = async (req, res) => {
   try {
-    const banner = await Banner.findByIdAndUpdate(
+    const banner = await AuditoriumBanner.findByIdAndUpdate(
       req.params.id,
       { $inc: { clickCount: 1 } },
       { new: true }
     );
 
     if (!banner) {
-      return errorResponse(res, 'Banner not found', 404);
+      return errorResponse(res, 'Auditorium banner not found', 404);
     }
 
-    return successResponse(res, { banner }, 'Banner click recorded');
+    return successResponse(res, { banner }, 'Auditorium banner click recorded');
   } catch (error) {
-    console.error('Increment banner click error:', error);
-    return errorResponse(res, 'Error recording banner click', 500);
+    console.error('Increment auditorium banner click error:', error);
+    return errorResponse(res, 'Error recording auditorium banner click', 500);
   }
 };

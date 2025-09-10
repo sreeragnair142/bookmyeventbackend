@@ -1,6 +1,6 @@
 import express from "express";
 import { body } from "express-validator";
-import Provider from "../models/Provider.js";
+import Auditorium from "../models/audi.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import upload, { handleMulterError } from "../middleware/upload.js";
 import { validateRequest } from "../utils/validation.js";
@@ -18,24 +18,20 @@ const safeParseInt = (value) => {
 
   if (value === undefined || value === null || value === "") return undefined;
 
-  // If it's already a number, return it if it's an integer
   if (typeof value === "number") {
     return Number.isInteger(value) ? value : Math.floor(value);
   }
 
-  // If it's an array, take the first element
   if (Array.isArray(value)) {
     if (value.length === 0) return undefined;
     value = value[0];
   }
 
-  // If it's an object (but not array), try to get a meaningful value
   if (typeof value === "object") {
     console.warn("Unexpected object in safeParseInt:", value);
     return undefined;
   }
 
-  // Convert to string first, then to number
   const stringValue = String(value).trim();
   if (stringValue === "") return undefined;
 
@@ -50,24 +46,20 @@ const safeParseFloat = (value) => {
 
   if (value === undefined || value === null || value === "") return undefined;
 
-  // If it's already a number, return it
   if (typeof value === "number") {
     return isFinite(value) ? value : undefined;
   }
 
-  // If it's an array, take the first element
   if (Array.isArray(value)) {
     if (value.length === 0) return undefined;
     value = value[0];
   }
 
-  // If it's an object (but not array), try to get a meaningful value
   if (typeof value === "object") {
     console.warn("Unexpected object in safeParseFloat:", value);
     return undefined;
   }
 
-  // Convert to string first, then to number
   const stringValue = String(value).trim();
   if (stringValue === "") return undefined;
 
@@ -82,22 +74,18 @@ const safeParseBoolean = (value) => {
 
   if (value === undefined || value === null) return undefined;
 
-  // If it's already a boolean, return it
   if (typeof value === "boolean") return value;
 
-  // If it's an array, take the first element
   if (Array.isArray(value)) {
     if (value.length === 0) return undefined;
     value = value[0];
   }
 
-  // If it's an object (but not array), return undefined
   if (typeof value === "object") {
     console.warn("Unexpected object in safeParseBoolean:", value);
     return undefined;
   }
 
-  // Convert to string and check
   const stringValue = String(value).toLowerCase().trim();
 
   if (stringValue === "true" || stringValue === "1" || stringValue === "yes")
@@ -108,7 +96,7 @@ const safeParseBoolean = (value) => {
   return undefined;
 };
 
-// Get all providers (GET /api/providers)
+// Get all auditoriums (GET /api/auditoriums)
 router.get("/", async (req, res) => {
   try {
     const {
@@ -134,7 +122,7 @@ router.get("/", async (req, res) => {
       ];
     }
 
-    const providers = await Provider.find(filter)
+    const auditoriums = await Auditorium.find(filter)
       .populate("zone", "name")
       .populate("categories", "name")
       .populate("approvedBy", "firstName lastName")
@@ -142,7 +130,7 @@ router.get("/", async (req, res) => {
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
-    const total = await Provider.countDocuments(filter);
+    const total = await Auditorium.countDocuments(filter);
 
     const pagination = {
       currentPage: parseInt(page),
@@ -151,41 +139,39 @@ router.get("/", async (req, res) => {
       itemsPerPage: parseInt(limit),
     };
 
-    // Use response formatter if available, otherwise use standard format
     if (typeof paginatedResponse === "function") {
       return paginatedResponse(
         res,
-        { providers },
+        { auditoriums },
         pagination,
-        "Providers fetched successfully"
+        "Auditoriums fetched successfully"
       );
     } else {
       return res.json({
         success: true,
-        message: "Providers fetched successfully",
+        message: "Auditoriums fetched successfully",
         data: {
-          providers,
+          auditoriums,
           pagination,
         },
       });
     }
   } catch (error) {
-    console.error("Get providers error:", error);
+    console.error("Get auditoriums error:", error);
     if (typeof errorResponse === "function") {
-      return errorResponse(res, "Error fetching providers", 500);
+      return errorResponse(res, "Error fetching auditoriums", 500);
     } else {
       return res.status(500).json({
         success: false,
-        message: "Error fetching providers",
+        message: "Error fetching auditoriums",
       });
     }
   }
 });
 
-// Create new provider (POST /api/providers)
+// Create new auditorium (POST /api/auditoriums)
 router.post(
   "/",
-  // Temporarily remove authentication for testing
   // authenticate,
   // authorize('admin', 'manager'),
   upload.fields([
@@ -215,72 +201,68 @@ router.post(
       .isFloat()
       .withMessage("Valid longitude is required"),
   ],
-  // Temporarily disable validation for testing
   // validateRequest,
   async (req, res) => {
     try {
-      console.log("=== CREATE PROVIDER DEBUG ===");
+      console.log("=== CREATE AUDITORIUM DEBUG ===");
       console.log("Files received:", req.files);
       console.log("Body received:", req.body);
 
-      const providerData = { ...req.body };
+      const auditoriumData = { ...req.body };
 
-      // Handle all file uploads
       if (req.files) {
         if (req.files.logo) {
-          providerData.logo = req.files.logo[0].path.replace(/\\/g, "/");
+          auditoriumData.logo = req.files.logo[0].path.replace(/\\/g, "/");
         }
         if (req.files.coverImage) {
-          providerData.coverImage = req.files.coverImage[0].path.replace(
+          auditoriumData.coverImage = req.files.coverImage[0].path.replace(
             /\\/g,
             "/"
           );
         }
         if (req.files.tinCertificate) {
-          providerData.tinCertificate =
+          auditoriumData.tinCertificate =
             req.files.tinCertificate[0].path.replace(/\\/g, "/");
         }
         if (req.files.bannerImage) {
-          providerData.bannerImage = req.files.bannerImage[0].path.replace(
+          auditoriumData.bannerImage = req.files.bannerImage[0].path.replace(
             /\\/g,
             "/"
           );
         }
         if (req.files.categoryImage) {
-          providerData.categoryImage = req.files.categoryImage[0].path.replace(
+          auditoriumData.categoryImage = req.files.categoryImage[0].path.replace(
             /\\/g,
             "/"
           );
         }
       }
 
-      console.log("Provider data to save:", providerData);
+      console.log("Auditorium data to save:", auditoriumData);
       console.log("Data types check:");
       console.log(
         "estimatedDeliveryTime:",
-        typeof providerData.estimatedDeliveryTime,
-        providerData.estimatedDeliveryTime
+        typeof auditoriumData.estimatedDeliveryTime,
+        auditoriumData.estimatedDeliveryTime
       );
       console.log(
         "estimatedDeliveryTimeMax:",
-        typeof providerData.estimatedDeliveryTimeMax,
-        providerData.estimatedDeliveryTimeMax
+        typeof auditoriumData.estimatedDeliveryTimeMax,
+        auditoriumData.estimatedDeliveryTimeMax
       );
       console.log(
         "latitude:",
-        typeof providerData.latitude,
-        providerData.latitude
+        typeof auditoriumData.latitude,
+        auditoriumData.latitude
       );
       console.log(
         "longitude:",
-        typeof providerData.longitude,
-        providerData.longitude
+        typeof auditoriumData.longitude,
+        auditoriumData.longitude
       );
 
-      // Create a clean object without problematic conversions first
       const cleanData = {};
 
-      // Copy all string fields directly (including all possible variations)
       const stringFields = [
         "storeName",
         "ownerFirstName",
@@ -306,28 +288,27 @@ router.post(
 
       stringFields.forEach((field) => {
         if (
-          providerData[field] !== undefined &&
-          providerData[field] !== null &&
-          providerData[field] !== ""
+          auditoriumData[field] !== undefined &&
+          auditoriumData[field] !== null &&
+          auditoriumData[field] !== ""
         ) {
-          cleanData[field] = String(providerData[field]).trim();
+          cleanData[field] = String(auditoriumData[field]).trim();
         }
       });
 
-      // Handle numeric fields with extra safety
       const numericFields = {
         latitude: "float",
         longitude: "float",
-        estimatedDeliveryTime: "int", // This is minimum delivery time
-        estimatedDeliveryTimeMax: "int", // This is maximum delivery time
-        minimumDeliveryTime: "int", // Alternative field name
-        maximumDeliveryTime: "int", // Alternative field name
+        estimatedDeliveryTime: "int",
+        estimatedDeliveryTimeMax: "int",
+        minimumDeliveryTime: "int",
+        maximumDeliveryTime: "int",
         averageRating: "float",
         totalReviews: "int",
       };
 
       Object.keys(numericFields).forEach((field) => {
-        const value = providerData[field];
+        const value = auditoriumData[field];
         console.log(`Processing ${field}:`, value, typeof value);
 
         if (value !== undefined && value !== null && value !== "") {
@@ -345,10 +326,9 @@ router.post(
         }
       });
 
-      // Handle boolean fields
       const booleanFields = ["isActive", "isApproved", "isFeatured"];
       booleanFields.forEach((field) => {
-        const value = providerData[field];
+        const value = auditoriumData[field];
         if (value !== undefined && value !== null) {
           try {
             const parsed = safeParseBoolean(value);
@@ -359,8 +339,7 @@ router.post(
         }
       });
 
-      // Set defaults for required fields
-      const finalProviderData = {
+      const finalAuditoriumData = {
         ...cleanData,
         isActive: cleanData.isActive ?? true,
         isApproved: cleanData.isApproved ?? false,
@@ -368,7 +347,6 @@ router.post(
         averageRating: cleanData.averageRating ?? 0,
         totalReviews: cleanData.totalReviews ?? 0,
 
-        // Ensure required fields have values - using the exact field names the model expects
         storeName: cleanData.storeName || "Default Store Name",
         storeAddress:
           cleanData.storeAddress || cleanData.address || "Default Address",
@@ -379,7 +357,6 @@ router.post(
             .toISOString()
             .split("T")[0],
 
-        // Map delivery time fields to the correct field names the model expects
         minimumDeliveryTime:
           cleanData.minimumDeliveryTime ||
           cleanData.estimatedDeliveryTime ||
@@ -389,48 +366,45 @@ router.post(
           cleanData.estimatedDeliveryTimeMax ||
           45,
 
-        // Keep the original field names too for backward compatibility
         estimatedDeliveryTime: cleanData.estimatedDeliveryTime || 15,
         estimatedDeliveryTimeMax: cleanData.estimatedDeliveryTimeMax || 45,
 
-        // Handle categories array
-        categories: Array.isArray(providerData.categories)
-          ? providerData.categories
-          : providerData.categories
-          ? [providerData.categories]
+        categories: Array.isArray(auditoriumData.categories)
+          ? auditoriumData.categories
+          : auditoriumData.categories
+          ? [auditoriumData.categories]
           : [],
       };
 
-      // Remove any remaining undefined values
-      Object.keys(finalProviderData).forEach((key) => {
+      Object.keys(finalAuditoriumData).forEach((key) => {
         if (
-          finalProviderData[key] === undefined ||
-          finalProviderData[key] === null ||
-          finalProviderData[key] === ""
+          finalAuditoriumData[key] === undefined ||
+          finalAuditoriumData[key] === null ||
+          finalAuditoriumData[key] === ""
         ) {
-          delete finalProviderData[key];
+          delete finalAuditoriumData[key];
         }
       });
 
-      console.log("Final provider data with defaults:", finalProviderData);
+      console.log("Final auditorium data with defaults:", finalAuditoriumData);
       console.log("Required fields check:");
-      console.log("- storeName:", finalProviderData.storeName);
-      console.log("- storeAddress:", finalProviderData.storeAddress);
-      console.log("- businessTIN:", finalProviderData.businessTIN);
-      console.log("- tinExpireDate:", finalProviderData.tinExpireDate);
+      console.log("- storeName:", finalAuditoriumData.storeName);
+      console.log("- storeAddress:", finalAuditoriumData.storeAddress);
+      console.log("- businessTIN:", finalAuditoriumData.businessTIN);
+      console.log("- tinExpireDate:", finalAuditoriumData.tinExpireDate);
       console.log(
         "- minimumDeliveryTime:",
-        finalProviderData.minimumDeliveryTime
+        finalAuditoriumData.minimumDeliveryTime
       );
       console.log(
         "- maximumDeliveryTime:",
-        finalProviderData.maximumDeliveryTime
+        finalAuditoriumData.maximumDeliveryTime
       );
 
-      const provider = new Provider(finalProviderData);
-      await provider.save();
+      const auditorium = new Auditorium(finalAuditoriumData);
+      await auditorium.save();
 
-      const populatedProvider = await Provider.findById(provider._id)
+      const populatedAuditorium = await Auditorium.findById(auditorium._id)
         .populate("zone", "name")
         .populate("categories", "name")
         .populate("approvedBy", "firstName lastName");
@@ -438,27 +412,26 @@ router.post(
       if (typeof successResponse === "function") {
         return successResponse(
           res,
-          { provider: populatedProvider },
-          "Provider created successfully",
+          { auditorium: populatedAuditorium },
+          "Auditorium created successfully",
           201
         );
       } else {
         return res.status(201).json({
           success: true,
-          message: "Provider created successfully",
-          data: { provider: populatedProvider },
+          message: "Auditorium created successfully",
+          data: { auditorium: populatedAuditorium },
         });
       }
     } catch (error) {
-      console.error("Create provider error:", error);
+      console.error("Create auditorium error:", error);
       console.error("Error details:", {
         name: error.name,
         message: error.message,
         stack: error.stack,
-        errors: error.errors, // MongoDB validation errors
+        errors: error.errors,
       });
 
-      // Handle specific MongoDB validation errors
       if (error.name === "ValidationError") {
         const validationErrors = Object.values(error.errors).map(
           (err) => err.message
@@ -481,13 +454,13 @@ router.post(
       if (typeof errorResponse === "function") {
         return errorResponse(
           res,
-          `Error creating provider: ${error.message}`,
+          `Error creating auditorium: ${error.message}`,
           500
         );
       } else {
         return res.status(500).json({
           success: false,
-          message: `Error creating provider: ${error.message}`,
+          message: `Error creating auditorium: ${error.message}`,
           error: error.toString(),
         });
       }
@@ -495,7 +468,7 @@ router.post(
   }
 );
 
-// Get providers by zone (GET /api/providers/zone/:zoneId)
+// Get auditoriums by zone (GET /api/auditoriums/zone/:zoneId)
 router.get("/zone/:zoneId", async (req, res) => {
   try {
     const { zoneId } = req.params;
@@ -511,7 +484,7 @@ router.get("/zone/:zoneId", async (req, res) => {
       filter.isFeatured = isFeatured === "true";
     }
 
-    const providers = await Provider.find(filter)
+    const auditoriums = await Auditorium.find(filter)
       .populate("zone", "name")
       .populate("categories", "name")
       .sort({ isFeatured: -1, averageRating: -1 });
@@ -519,44 +492,44 @@ router.get("/zone/:zoneId", async (req, res) => {
     if (typeof successResponse === "function") {
       return successResponse(
         res,
-        { providers },
-        "Zone providers fetched successfully"
+        { auditoriums },
+        "Zone auditoriums fetched successfully"
       );
     } else {
       return res.json({
         success: true,
-        message: "Zone providers fetched successfully",
-        data: { providers },
+        message: "Zone auditoriums fetched successfully",
+        data: { auditoriums },
       });
     }
   } catch (error) {
-    console.error("Get providers by zone error:", error);
+    console.error("Get auditoriums by zone error:", error);
     if (typeof errorResponse === "function") {
-      return errorResponse(res, "Error fetching zone providers", 500);
+      return errorResponse(res, "Error fetching zone auditoriums", 500);
     } else {
       return res.status(500).json({
         success: false,
-        message: "Error fetching zone providers",
+        message: "Error fetching zone auditoriums",
       });
     }
   }
 });
 
-// Get provider by ID (GET /api/providers/:id)
+// Get auditorium by ID (GET /api/auditoriums/:id)
 router.get("/:id", async (req, res) => {
   try {
-    const provider = await Provider.findById(req.params.id)
+    const auditorium = await Auditorium.findById(req.params.id)
       .populate("zone", "name")
       .populate("categories", "name image")
       .populate("approvedBy", "firstName lastName");
 
-    if (!provider) {
+    if (!auditorium) {
       if (typeof errorResponse === "function") {
-        return errorResponse(res, "Provider not found", 404);
+        return errorResponse(res, "Auditorium not found", 404);
       } else {
         return res.status(404).json({
           success: false,
-          message: "Provider not found",
+          message: "Auditorium not found",
         });
       }
     }
@@ -564,33 +537,32 @@ router.get("/:id", async (req, res) => {
     if (typeof successResponse === "function") {
       return successResponse(
         res,
-        { provider },
-        "Provider fetched successfully"
+        { auditorium },
+        "Auditorium fetched successfully"
       );
     } else {
       return res.json({
         success: true,
-        message: "Provider fetched successfully",
-        data: { provider },
+        message: "Auditorium fetched successfully",
+        data: { auditorium },
       });
     }
   } catch (error) {
-    console.error("Get provider error:", error);
+    console.error("Get auditorium error:", error);
     if (typeof errorResponse === "function") {
-      return errorResponse(res, "Error fetching provider", 500);
+      return errorResponse(res, "Error fetching auditorium", 500);
     } else {
       return res.status(500).json({
         success: false,
-        message: "Error fetching provider",
+        message: "Error fetching auditorium",
       });
     }
   }
 });
 
-// Update provider (PUT /api/providers/:id)
+// Update auditorium (PUT /api/auditoriums/:id)
 router.put(
   "/:id",
-  // Temporarily disable authentication for testing
   // authenticate,
   // authorize('admin', 'manager'),
   upload.fields([
@@ -616,26 +588,24 @@ router.put(
       .isMongoId()
       .withMessage("Valid zone ID is required"),
   ],
-  // Temporarily disable validation for testing
   // validateRequest,
   async (req, res) => {
     try {
-      const provider = await Provider.findById(req.params.id);
+      const auditorium = await Auditorium.findById(req.params.id);
 
-      if (!provider) {
+      if (!auditorium) {
         if (typeof errorResponse === "function") {
-          return errorResponse(res, "Provider not found", 404);
+          return errorResponse(res, "Auditorium not found", 404);
         } else {
           return res.status(404).json({
             success: false,
-            message: "Provider not found",
+            message: "Auditorium not found",
           });
         }
       }
 
       const updateData = { ...req.body };
 
-      // Safe type conversion for update data
       if (updateData.latitude !== undefined) {
         updateData.latitude = safeParseFloat(updateData.latitude);
       }
@@ -692,14 +662,13 @@ router.put(
         }
       }
 
-      // Remove undefined values
       Object.keys(updateData).forEach((key) => {
         if (updateData[key] === undefined) {
           delete updateData[key];
         }
       });
 
-      const updatedProvider = await Provider.findByIdAndUpdate(
+      const updatedAuditorium = await Auditorium.findByIdAndUpdate(
         req.params.id,
         updateData,
         { new: true, runValidators: true }
@@ -712,56 +681,54 @@ router.put(
       if (typeof successResponse === "function") {
         return successResponse(
           res,
-          { provider: updatedProvider },
-          "Provider updated successfully"
+          { auditorium: updatedAuditorium },
+          "Auditorium updated successfully"
         );
       } else {
         return res.json({
           success: true,
-          message: "Provider updated successfully",
-          data: { provider: updatedProvider },
+          message: "Auditorium updated successfully",
+          data: { auditorium: updatedAuditorium },
         });
       }
     } catch (error) {
-      console.error("Update provider error:", error);
+      console.error("Update auditorium error:", error);
       if (typeof errorResponse === "function") {
-        return errorResponse(res, "Error updating provider", 500);
+        return errorResponse(res, "Error updating auditorium", 500);
       } else {
         return res.status(500).json({
           success: false,
-          message: "Error updating provider",
+          message: "Error updating auditorium",
         });
       }
     }
   }
 );
 
-// Toggle provider status (PATCH /api/providers/:id/toggle-status)
-// Toggle featured status
-
+// Toggle auditorium status (PATCH /api/auditoriums/:id/toggle-status)
 router.patch("/:id/toggle-featured", async (req, res) => {
   try {
-    console.log(`Toggle featured for provider: ${req.params.id}`);
+    console.log(`Toggle featured for auditorium: ${req.params.id}`);
 
-    const provider = await Provider.findById(req.params.id);
-    if (!provider) {
+    const auditorium = await Auditorium.findById(req.params.id);
+    if (!auditorium) {
       return res.status(404).json({
         success: false,
-        message: "Provider not found",
+        message: "Auditorium not found",
       });
     }
 
-    provider.isFeatured = !provider.isFeatured;
-    await provider.save();
+    auditorium.isFeatured = !auditorium.isFeatured;
+    await auditorium.save();
 
     console.log(
-      `Provider ${provider._id} featured status: ${provider.isFeatured}`
+      `Auditorium ${auditorium._id} featured status: ${auditorium.isFeatured}`
     );
 
     return res.json({
       success: true,
-      message: `Provider ${provider.isFeatured ? "featured" : "unfeatured"}`,
-      data: { provider },
+      message: `Auditorium ${auditorium.isFeatured ? "featured" : "unfeatured"}`,
+      data: { auditorium },
     });
   } catch (error) {
     console.error("Toggle featured error:", error);
@@ -774,25 +741,25 @@ router.patch("/:id/toggle-featured", async (req, res) => {
 
 router.patch("/:id/toggle-status", async (req, res) => {
   try {
-    console.log(`Toggle status for provider: ${req.params.id}`);
+    console.log(`Toggle status for auditorium: ${req.params.id}`);
 
-    const provider = await Provider.findById(req.params.id);
-    if (!provider) {
+    const auditorium = await Auditorium.findById(req.params.id);
+    if (!auditorium) {
       return res.status(404).json({
         success: false,
-        message: "Provider not found",
+        message: "Auditorium not found",
       });
     }
 
-    provider.isActive = !provider.isActive;
-    await provider.save();
+    auditorium.isActive = !auditorium.isActive;
+    await auditorium.save();
 
-    console.log(`Provider ${provider._id} active status: ${provider.isActive}`);
+    console.log(`Auditorium ${auditorium._id} active status: ${auditorium.isActive}`);
 
     return res.json({
       success: true,
-      message: `Provider ${provider.isActive ? "activated" : "deactivated"}`,
-      data: { provider },
+      message: `Auditorium ${auditorium.isActive ? "activated" : "deactivated"}`,
+      data: { auditorium },
     });
   } catch (error) {
     console.error("Toggle status error:", error);
@@ -802,45 +769,45 @@ router.patch("/:id/toggle-status", async (req, res) => {
     });
   }
 });
-// Delete provider (DELETE /api/providers/:id)
+
+// Delete auditorium (DELETE /api/auditoriums/:id)
 router.delete(
   "/:id",
-  // Temporarily disable authentication for testing
   // authenticate,
   // authorize('admin'),
   async (req, res) => {
     try {
-      const provider = await Provider.findById(req.params.id);
+      const auditorium = await Auditorium.findById(req.params.id);
 
-      if (!provider) {
+      if (!auditorium) {
         if (typeof errorResponse === "function") {
-          return errorResponse(res, "Provider not found", 404);
+          return errorResponse(res, "Auditorium not found", 404);
         } else {
           return res.status(404).json({
             success: false,
-            message: "Provider not found",
+            message: "Auditorium not found",
           });
         }
       }
 
-      await Provider.findByIdAndDelete(req.params.id);
+      await Auditorium.findByIdAndDelete(req.params.id);
 
       if (typeof successResponse === "function") {
-        return successResponse(res, null, "Provider deleted successfully");
+        return successResponse(res, null, "Auditorium deleted successfully");
       } else {
         return res.json({
           success: true,
-          message: "Provider deleted successfully",
+          message: "Auditorium deleted successfully",
         });
       }
     } catch (error) {
-      console.error("Delete provider error:", error);
+      console.error("Delete auditorium error:", error);
       if (typeof errorResponse === "function") {
-        return errorResponse(res, "Error deleting provider", 500);
+        return errorResponse(res, "Error deleting auditorium", 500);
       } else {
         return res.status(500).json({
           success: false,
-          message: "Error deleting provider",
+          message: "Error deleting auditorium",
         });
       }
     }
