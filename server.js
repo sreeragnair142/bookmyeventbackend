@@ -26,6 +26,9 @@ import auditoriumCoupons from './routes/audiCouponRoutes.js'; // Added auditoriu
 import brands from './routes/brandroutes.js'; // Added auditorium routes
 import vehicleroutes from './routes/vehicle.js'; // Added auditorium routes
 import Audibrands from './routes/audibrand.js'; // Added auditorium routes
+import Createvenue from './routes/venueCreate.js'; // Added auditorium routes
+
+
 
 
 
@@ -99,6 +102,8 @@ app.use('/api/brands', brands);
 app.use('/api/audibrands', Audibrands);
 
 app.use('/api/vehicles', vehicleroutes);
+app.use('/api/createvenue', Createvenue);
+
 
 
 

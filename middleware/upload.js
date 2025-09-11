@@ -251,7 +251,8 @@ export const storeUpload = upload.fields([
   { name: 'logo', maxCount: 1 },
   { name: 'coverImage', maxCount: 1 },
   { name: 'tinCertificate', maxCount: 1 },
-  { name: 'documents', maxCount: 10 }
+  { name: 'documents', maxCount: 10 },
+   { name: 'floorPlan', maxCount: 1 },
 ]);
 
 // Flexible upload for testing/debugging
